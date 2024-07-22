@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  reverse-proxy:
+    image: haproxy:2.4
+    restart: always
+    networks:
+      backend: {}
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./haproxy/reverse/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:rw
+
+  ingress-proxy:
+    image: nginx:latest
+    restart: always
+    network_mode: host
+    volumes:
+      - ./nginx/ingress/default.conf:/etc/nginx/conf.d/default.conf:rw
+      - ./nginx/ingress/nginx.conf:/etc/nginx/nginx.conf:rw
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.python
+    image: yandexcloud/python-app:latest
+    restart: always
+    networks:
+      backend:
+        ipv4_address: 172.20.0.5
+    environment:
+      - DB_HOST=db
+      - DB_USER=${MYSQL_USER}
+      - DB_PASSWORD=${MYSQL_PASSWORD}
+      - DB_NAME=${MYSQL_DATABASE}
+    depends_on:
+      - db
+
+  db:
+    image: mysql:8
+    restart: always
+    networks:
+      backend:
+        ipv4_address: 172.20.0.10
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+
+networks:
+  backend:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24
